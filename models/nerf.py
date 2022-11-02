@@ -32,7 +32,7 @@ class PosEmbedding(nn.Module):
 
 class NeRF(nn.Module):
     def __init__(self, typ,
-                 D=8, W=256, skips=[4],
+                 D=8, W=512, skips=[4],
                  in_channels_xyz=63, in_channels_dir=27,
                  encode_appearance=False, in_channels_a=48,
                  encode_transient=False, in_channels_t=16,
@@ -86,8 +86,12 @@ class NeRF(nn.Module):
 
         # static output layers
         self.static_sigma = nn.Sequential(nn.Linear(W, 1), nn.Softplus())
-        self.static_rgb = nn.Sequential(nn.Linear(W//2, 3), nn.Sigmoid())
-
+        # self.static_rgb = nn.Sequential(nn.Linear(W//2, 3), nn.Sigmoid())
+        self.static_rgb = nn.Sequential(
+                                        nn.Linear(W//2, W//2), nn.ReLU(True),
+                                        nn.Linear(W//2, W//2), nn.ReLU(True),
+                                        nn.Linear(W//2, W//2), nn.ReLU(True),
+                                        nn.Linear(W//2, 3), nn.Sigmoid())
         if self.encode_transient:
             # transient encoding layers
             self.transient_encoding = nn.Sequential(
