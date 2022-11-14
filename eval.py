@@ -64,7 +64,7 @@ def get_opts():
     parser.add_argument('--beta_min', type=float, default=0.1,
                         help='minimum color variance for each ray')
 
-    parser.add_argument('--chunk', type=int, default=32*1024*4,
+    parser.add_argument('--chunk', type=int, default=32*1024,
                         help='chunk size to split the input to avoid OOM')
 
     parser.add_argument('--ckpt_path', type=str, required=True,
@@ -149,8 +149,10 @@ if __name__ == "__main__":
                      beta_min=args.beta_min).cuda()
 
     load_ckpt(nerf_coarse, args.ckpt_path, model_name='nerf_coarse')
-    load_ckpt(nerf_fine, args.ckpt_path, model_name='nerf_fine')
-
+    try:
+        load_ckpt(nerf_fine, args.ckpt_path, model_name='nerf_fine')
+    except RuntimeError:
+        print("ignoring")
     models = {'coarse': nerf_coarse, 'fine': nerf_fine}
 
     imgs, psnrs = [], []
@@ -166,6 +168,7 @@ if __name__ == "__main__":
         dataset.test_K = np.array([[dataset.test_focal, 0, dataset.test_img_w/2],
                                    [0, dataset.test_focal, dataset.test_img_h/2],
                                    [0,                  0,                    1]])
+        print(scene)
         if scene == 'brandenburg_gate':
             # select appearance embedding, hard-coded for each scene
             dataset.test_appearance_idx = 1123 # 85572957_6053497857.jpg
