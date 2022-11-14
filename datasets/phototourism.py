@@ -182,8 +182,7 @@ class PhototourismDataset(Dataset):
 
         else: # for testing, create a parametric rendering path
             # test poses and appearance index are defined in eval.py
-            self.val_id = self.img_ids_train[0]
-            #pass
+            pass
 
     def define_transforms(self):
         self.transform = T.ToTensor()
