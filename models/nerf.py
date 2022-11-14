@@ -32,7 +32,7 @@ class PosEmbedding(nn.Module):
 
 class NeRF(nn.Module):
     def __init__(self, typ,
-                 D=8, W=512, skips=[4],
+                 D=8, W=256, skips=[4],
                  in_channels_xyz=63, in_channels_dir=27,
                  encode_appearance=False, in_channels_a=48,
                  encode_transient=False, in_channels_t=16,
