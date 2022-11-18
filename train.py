@@ -23,6 +23,10 @@ from metrics import *
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.loggers import TestTubeLogger
+from pytorch_lightning.loggers import WandbLogger
+
+
+wandb_logger = WandbLogger(project="nerfw-testing")
 
 
 class NeRFSystem(LightningModule):
@@ -164,8 +168,8 @@ class NeRFSystem(LightningModule):
             img_gt = rgbs.view(H, W, 3).permute(2, 0, 1).cpu() # (3, H, W)
             depth = visualize_depth(results[f'depth_{typ}'].view(H, W)) # (3, H, W)
             stack = torch.stack([img_gt, img, depth]) # (3, 3, H, W)
-            self.logger.experiment.add_images('val/GT_pred_depth',
-                                               stack, self.global_step)
+            #self.logger.experiment.add_images('val/GT_pred_depth',
+             #                                  stack, self.global_step)
 
         psnr_ = psnr(results[f'rgb_{typ}'], rgbs)
         log['val_psnr'] = psnr_
@@ -198,7 +202,7 @@ def main(hparams):
     trainer = Trainer(max_epochs=hparams.num_epochs,
                       checkpoint_callback=checkpoint_callback,
                       resume_from_checkpoint=hparams.ckpt_path,
-                      logger=logger,
+                      logger=wandb_logger,
                       weights_summary=None,
                       progress_bar_refresh_rate=hparams.refresh_every,
                       gpus=hparams.num_gpus,

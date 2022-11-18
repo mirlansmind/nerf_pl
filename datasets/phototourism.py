@@ -11,10 +11,11 @@ from torchvision import transforms as T
 from .ray_utils import *
 from .colmap_utils import \
     read_cameras_binary, read_images_binary, read_points3d_binary
+from blender import add_perturbation
 
 
 class PhototourismDataset(Dataset):
-    def __init__(self, root_dir, split='train', img_downscale=1, val_num=1, use_cache=False):
+    def __init__(self, root_dir, split='train', img_downscale=1, val_num=1, use_cache=False, perturbation=[]):
         """
         img_downscale: how much scale to downsample the training images.
                        The original image sizes are around 500~100, so value of 1 or 2
@@ -26,7 +27,8 @@ class PhototourismDataset(Dataset):
                    data loading, especially for multigpu!)
         """
         self.root_dir = root_dir
-        self.split = split
+        self.perturbation = perturbation
+        self.split = split # by default train 
         assert img_downscale >= 1, 'image can only be downsampled, please set img_downscale>=1!'
         self.img_downscale = img_downscale
         if split == 'val': # image downscale=1 will cause OOM in val mode
@@ -40,7 +42,7 @@ class PhototourismDataset(Dataset):
 
     def read_meta(self):
         # read all files in the tsv first (split to train and test later)
-        tsv = os.path.join(self.root_dir, 'brandenburg.tsv')
+        tsv = os.path.join(self.root_dir, 'output.tsv')
         self.scene_name = os.path.basename(tsv)[:-4]
         self.files = pd.read_csv(tsv, sep='\t')
         self.files = self.files[~self.files['id'].isnull()] # remove data without id
@@ -75,7 +77,7 @@ class PhototourismDataset(Dataset):
             camdata = read_cameras_binary(os.path.join(self.root_dir, 'dense/0/sparse/cameras.bin'))
             for _, id_ in enumerate(camdata.keys()):
                 K = np.zeros((3, 3), dtype=np.float32)
-                # print(id_)
+
                 cam = camdata[id_]
                 img_w, img_h = int(cam.params[2]*2), int(cam.params[3]*2)
                 img_w_, img_h_ = img_w//self.img_downscale, img_h//self.img_downscale
@@ -112,7 +114,7 @@ class PhototourismDataset(Dataset):
         else:
             pts3d = read_points3d_binary(os.path.join(self.root_dir, 'dense/0/sparse/points3D.bin'))
             self.xyz_world = np.array([pts3d[p_id].xyz for p_id in pts3d])
-            xyz_world_h = np.concatenate([self.xyz_world, np.ones((len(self.xyz_world), 1))], -1)
+            xyz_world_h = np.concatenate([self.xyz_world, np.ones((len(self.xyz_world), 1))], -1) # homogeneous coords 
             # Compute near and far bounds for each image individually
             self.nears, self.fars = {}, {} # {id_: distance}
             for i, id_ in enumerate(self.img_ids):
@@ -130,6 +132,8 @@ class PhototourismDataset(Dataset):
                 self.fars[k] /= scale_factor
             self.xyz_world /= scale_factor
         self.poses_dict = {id_: self.poses[i] for i, id_ in enumerate(self.img_ids)}
+        ##################################
+        print(self.poses_dict)
             
         # Step 5. split the img_ids (the number of images is verfied to match that in the paper)
         self.img_ids_train = [id_ for i, id_ in enumerate(self.img_ids) 
@@ -156,6 +160,11 @@ class PhototourismDataset(Dataset):
                     img = Image.open(os.path.join(self.root_dir, 'dense/0/images',
                                                   self.image_paths[id_])).convert('RGB')
                     img_w, img_h = img.size
+                    # ADD PERTURBATION 
+                    if id_ != 0: # perturb everything except the first image.
+                           # cf. Section D in the supplementary material
+                        img = add_perturbation(img, self.perturbation, t)
+
                     if self.img_downscale > 1:
                         img_w = img_w//self.img_downscale
                         img_h = img_h//self.img_downscale
@@ -182,8 +191,7 @@ class PhototourismDataset(Dataset):
 
         else: # for testing, create a parametric rendering path
             # test poses and appearance index are defined in eval.py
-            self.val_id = self.img_ids_train[0]
-            #pass
+            pass
 
     def define_transforms(self):
         self.transform = T.ToTensor()
@@ -214,6 +222,11 @@ class PhototourismDataset(Dataset):
             img = Image.open(os.path.join(self.root_dir, 'dense/0/images',
                                           self.image_paths[id_])).convert('RGB')
             img_w, img_h = img.size
+            # ADD PERTURBATION 
+            if self.split == 'test_train' and idx != 0:
+                t = idx
+                img = add_perturbation(img, self.perturbation, idx)
+
             if self.img_downscale > 1:
                 img_w = img_w//self.img_downscale
                 img_h = img_h//self.img_downscale
