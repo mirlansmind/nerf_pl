@@ -11,7 +11,28 @@ from torchvision import transforms as T
 from .ray_utils import *
 from .colmap_utils import \
     read_cameras_binary, read_images_binary, read_points3d_binary
-from blender import add_perturbation
+
+from PIL import Image, ImageDraw
+
+def add_perturbation(img, perturbation, seed):
+    if 'color' in perturbation:
+        np.random.seed(seed)
+        img_np = np.array(img)/255.0
+        s = np.random.uniform(0.8, 1.2, size=3)
+        b = np.random.uniform(-0.2, 0.2, size=3)
+        img_np[..., :3] = np.clip(s*img_np[..., :3]+b, 0, 1)
+        img = Image.fromarray((255*img_np).astype(np.uint8))
+    if 'occ' in perturbation:
+        draw = ImageDraw.Draw(img)
+        np.random.seed(seed)
+        left = np.random.randint(200, 400)
+        top = np.random.randint(200, 400)
+        for i in range(10):
+            np.random.seed(10*seed+i)
+            random_color = tuple(np.random.choice(range(256), 3))
+            draw.rectangle(((left+20*i, top), (left+20*(i+1), top+200)),
+                            fill=random_color)
+    return img
 
 
 class PhototourismDataset(Dataset):
@@ -133,7 +154,6 @@ class PhototourismDataset(Dataset):
             self.xyz_world /= scale_factor
         self.poses_dict = {id_: self.poses[i] for i, id_ in enumerate(self.img_ids)}
         ##################################
-        print(self.poses_dict)
             
         # Step 5. split the img_ids (the number of images is verfied to match that in the paper)
         self.img_ids_train = [id_ for i, id_ in enumerate(self.img_ids) 
@@ -161,9 +181,9 @@ class PhototourismDataset(Dataset):
                                                   self.image_paths[id_])).convert('RGB')
                     img_w, img_h = img.size
                     # ADD PERTURBATION 
-                    if id_ != 0: # perturb everything except the first image.
-                           # cf. Section D in the supplementary material
-                        img = add_perturbation(img, self.perturbation, t)
+                    # if id_ != 0: # perturb everything except the first image.
+                    #        # cf. Section D in the supplementary material
+                    #     img = add_perturbation(img, self.perturbation, t)
 
                     if self.img_downscale > 1:
                         img_w = img_w//self.img_downscale
@@ -223,9 +243,9 @@ class PhototourismDataset(Dataset):
                                           self.image_paths[id_])).convert('RGB')
             img_w, img_h = img.size
             # ADD PERTURBATION 
-            if self.split == 'test_train' and idx != 0:
-                t = idx
-                img = add_perturbation(img, self.perturbation, idx)
+            # if self.split == 'test_train' and idx != 0:
+            #     t = idx
+            #     img = add_perturbation(img, self.perturbation, idx)
 
             if self.img_downscale > 1:
                 img_w = img_w//self.img_downscale

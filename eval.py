@@ -159,6 +159,7 @@ if __name__ == "__main__":
 
     kwargs = {}
     # define testing poses and appearance index for phototourism
+    print(dataset.poses_dict)
     if args.dataset_name == 'phototourism' and args.split == 'test':
         # define testing camera intrinsics (hard-coded, feel free to change)
         dataset.test_img_w, dataset.test_img_h = args.img_wh
@@ -168,13 +169,13 @@ if __name__ == "__main__":
                                    [0,                  0,                    1]])
         if scene == 'brandenburg_gate':
             # select appearance embedding, hard-coded for each scene
-            dataset.test_appearance_idx = 1123 # 85572957_6053497857.jpg
+            dataset.test_appearance_idx = 1123 # 85572957_6053497857.jpg   # here the author adds a class attribute 
             N_frames = 30*4
             dx = np.linspace(0, 0.03, N_frames)
             dy = np.linspace(0, -0.1, N_frames)
             dz = np.linspace(0, 0.5, N_frames)
             # define poses
-            dataset.poses_test = np.tile(dataset.poses_dict[1123], (N_frames, 1, 1))
+            dataset.poses_test = np.tile(dataset.poses_dict[1123], (N_frames, 1, 1))  
             for i in range(N_frames):
                 dataset.poses_test[i, 0, 3] += dx[i]
                 dataset.poses_test[i, 1, 3] += dy[i]
