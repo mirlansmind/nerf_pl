@@ -174,11 +174,14 @@ class PhototourismDataset(Dataset):
             else:
                 self.all_rays = []
                 self.all_rgbs = []
+                self.all_masks = []
                 for id_ in self.img_ids_train:
                     c2w = torch.FloatTensor(self.poses_dict[id_])
 
                     img = Image.open(os.path.join(self.root_dir, 'dense/0/images',
                                                   self.image_paths[id_])).convert('RGB')
+                    mask = Image.open(os.path.join(self.root_dir, 'masks',
+                                                  self.image_paths[id_]))
                     img_w, img_h = img.size
                     # ADD PERTURBATION 
                     # if id_ != 0: # perturb everything except the first image.
@@ -189,9 +192,12 @@ class PhototourismDataset(Dataset):
                         img_w = img_w//self.img_downscale
                         img_h = img_h//self.img_downscale
                         img = img.resize((img_w, img_h), Image.LANCZOS)
+                        mask = mask.resize((img_w, img_h), Image.LANCZOS)
                     img = self.transform(img) # (3, h, w)
-                    img = img.view(3, -1).permute(1, 0) # (h*w, 3) RGB
+                    img = img.view(3, -1).permute(1, 0) # (h*w, 3) 
+                    mask = mask.view(1, -1).permute(1, 0) # (h*w, 1) 
                     self.all_rgbs += [img]
+                    self.all_masks+= [mask]
                     
                     directions = get_ray_directions(img_h, img_w, self.Ks[1])
                     rays_o, rays_d = get_rays(directions, c2w)
@@ -205,6 +211,7 @@ class PhototourismDataset(Dataset):
                                     
                 self.all_rays = torch.cat(self.all_rays, 0) # ((N_images-1)*h*w, 8)
                 self.all_rgbs = torch.cat(self.all_rgbs, 0) # ((N_images-1)*h*w, 3)
+                self.all_masks = torch.cat(self.all_masks, 0) # ((N_images-1)*h*w, 1)
         
         elif self.split in ['val', 'test_train']: # use the first image as val image (also in train)
             self.val_id = self.img_ids_train[0]
@@ -229,7 +236,8 @@ class PhototourismDataset(Dataset):
         if self.split == 'train': # use data in the buffers
             sample = {'rays': self.all_rays[idx, :8],
                       'ts': self.all_rays[idx, 8].long(),
-                      'rgbs': self.all_rgbs[idx]}
+                      'rgbs': self.all_rgbs[idx],
+                      'masks': self.all_masks[idx]}
 
         elif self.split in ['val', 'test_train']:
             sample = {}
@@ -241,6 +249,8 @@ class PhototourismDataset(Dataset):
 
             img = Image.open(os.path.join(self.root_dir, 'dense/0/images',
                                           self.image_paths[id_])).convert('RGB')
+            mask = Image.open(os.path.join(self.root_dir, 'masks',
+                                        self.image_paths[id_]))
             img_w, img_h = img.size
             # ADD PERTURBATION 
             # if self.split == 'test_train' and idx != 0:
@@ -251,9 +261,12 @@ class PhototourismDataset(Dataset):
                 img_w = img_w//self.img_downscale
                 img_h = img_h//self.img_downscale
                 img = img.resize((img_w, img_h), Image.LANCZOS)
+                mask = mask.resize((img_w, img_h), Image.LANCZOS)
             img = self.transform(img) # (3, h, w)
             img = img.view(3, -1).permute(1, 0) # (h*w, 3) RGB
+            mask = mask.view(1, -1).permute(1, 0) # (h*w, 1) 
             sample['rgbs'] = img
+            sample['masks'] = mask 
 
             directions = get_ray_directions(img_h, img_w, self.Ks[1])
             rays_o, rays_d = get_rays(directions, c2w)
